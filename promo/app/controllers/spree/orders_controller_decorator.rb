@@ -17,6 +17,11 @@ Spree::OrdersController.class_eval do
               render :edit and return
             end
 
+            if promotion.usage_limit_exceeded?
+              flash[:error] = t(:coupon_code_max_usage)
+              render :edit and return
+            end
+
             fire_event('spree.checkout.coupon_code_added', :coupon_code => @order.coupon_code)
             promo = @order.adjustments.promotion.detect { |p| p.originator.promotion.code == @order.coupon_code }
 
@@ -35,14 +40,12 @@ Spree::OrdersController.class_eval do
           end
         end
       end
-    end
-  end
 
-  def apply_coupon_code
-    return if @order.coupon_code.blank?
-    if Spree::Promotion.exists?(:code => @order.coupon_code)
-      fire_event('spree.checkout.coupon_code_added', :coupon_code => @order.coupon_code)
-      true
+      @order.line_items = @order.line_items.select {|li| li.quantity > 0 }
+      fire_event('spree.order.contents_changed')
+      respond_with(@order) { |format| format.html { redirect_to cart_path } }
+    else
+      respond_with(@order)
     end
   end
 
